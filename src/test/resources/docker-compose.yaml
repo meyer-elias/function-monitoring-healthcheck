@@ -1,0 +1,51 @@
+version: "3.8"
+services:
+  zookeeper:
+    image: "bitnami/zookeeper:3"
+    ports:
+      - "2181:2181"
+      - "3181:3181"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+      - ZOO_TLS_CLIENT_ENABLE=false
+      - ZOO_TLS_PORT_NUMBER=3181
+      - ZOO_LOG_LEVEL=DEBUG
+
+  kafka:
+    image: "bitnami/kafka:2"
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=false
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092
+    depends_on:
+      - zookeeper
+
+  #Emulator local to AWS Lambda
+  localstack:
+    image: 'localstack/localstack:4.4.0-amd64'
+    container_name: "${LOCALSTACK_DOCKER_NAME:-localstack-main}"
+    ports:
+      - "127.0.0.1:4566:4566"            # LocalStack Gateway
+      - "127.0.0.1:4510-4559:4510-4559"  # external services port range
+    environment:
+      - LOCALSTACK_HOSTNAME=localhost.localstack.cloud
+      - HOSTNAME_EXTERNAL=localstack
+      - SERVICES=lambda
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - DEFAULT_REGION=us-east-1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - DEBUG=1
+      - DATA_DIR=/tmp/localtest/data
+    volumes:
+      - "${TMPDIR:-/tmp}/localtest:/tmp/localtest"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - ./localstack-init.sh:/etc/localstack/init/ready.d/init.sh
+      - ./lambda.zip:/tmp/function.zip
